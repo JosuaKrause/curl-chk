@@ -1,0 +1,111 @@
+#!/bin/bash
+
+REAL_CURL='curl'
+
+last_arg=
+url_pattern='[#\?](.*\&)*md5=([0-9a-fA-F]+)'
+
+usage() {
+  $REAL_CURL "$@"
+  local x=$?
+  echo <<EOF
+This wrapper of curl will verify the contents of URLs specified with --url using
+the md5 sum of the output file which must be specified using -o. This only works
+for single files without filename patterns. The expected md5 sum can either be
+passed with --md5 or can be defined in the URL via the following regex:
+EOF
+  echo "/${url_pattern}/"
+  echo "Explicit md5 sums via --md5 take higher precedence."
+  return $x
+}
+
+array_contains() {
+  last_arg=
+  local request=$1; shift
+  local seeking=$1; shift
+  local in=1
+  local fin=0
+  for element; do
+    if [ $fin != 0 ]; then
+      last_arg="${element}"
+      fin=0
+      break
+    fi
+    if [ "${element}" == "${seeking}" ]; then
+      in=0
+      if [ $request == 0 ]; then
+        break
+      else
+        fin=1
+      fi
+    fi
+  done
+  if [ $fin != 0 ]; then
+    usage "--help"
+    echo "Error: expected argument after ${seeking}"
+    exit 42
+  fi
+  return $in
+}
+
+args=("$@")
+
+array_contains 0 "--help" "${args[@]}"
+if [ $? == 0 ]; then
+  usage "${args[@]}"
+  exit $?
+fi
+
+md5_sum=
+output_file=
+
+array_contains 1 "--md5" "${args[@]}"
+if [ $? == 0 ]; then
+  md5_sum="${last_arg}"
+  # remove --md5
+  arr=()
+  hold=0
+  for cur in "${args[@]}" ; do
+    if [ "${cur}" == "--md5" ]; then
+      hold=1
+    elif [ $hold != 0 ]; then
+      hold=0
+    else
+      arr+=("${cur}")
+    fi
+  done
+  args=("${arr[@]}")
+else
+  # try parsing the URL from --url
+  array_contains 1 "--url" "${args[@]}"
+  if [ $? == 0 ]; then
+    url="${last_arg}"
+    md5_sum=`echo "${url}" | sed -E "s/^.*${url_pattern}[^\/]*\$/\2/"`
+  fi
+fi
+
+array_contains 1 "-o" "${args[@]}"
+if [ $? == 0 ]; then
+  output_file="${last_arg}"
+else
+  array_contains 1 "--output" "${args[@]}"
+  if [ $? == 0 ]; then
+    output_file="${last_arg}"
+  fi
+fi
+
+$REAL_CURL "${args[@]}"
+if [ $? != 0 ]; then
+  exit $?
+fi
+
+if [ ! -z "${md5_sum}" ] && [ -f "${output_file}" ]; then
+  echo "verifying file ${output_file} to have md5: '${md5_sum}'"
+  md5_cmp=`md5 -q "${output_file}"`
+  echo "${md5_cmp}" | xargs test "${md5_sum}" =
+  if [ $? != 0 ]; then
+    echo "invalid md5 sum!"
+    echo "expected ${md5_sum} got ${md5_cmp}"
+    exit 69
+  fi
+fi

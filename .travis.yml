@@ -1,0 +1,9 @@
+os:
+  - linux
+  - osx
+language: c
+sudo: false
+env:
+  - TEST_MODE=run_tests
+install: true
+script: test/run.sh
