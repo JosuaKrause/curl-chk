@@ -7,3 +7,5 @@ env:
   - TEST_MODE=run_tests
 install: true
 script: test/run.sh
+notifications:
+  email: false
