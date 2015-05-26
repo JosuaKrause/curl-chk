@@ -1,9 +1,9 @@
-# curl_chk – checksum wrapper for curl
+# curl-chk – checksum wrapper for curl
 
 curl_chk is a wrapper for curl that verifies the content
 of the actual file that was downloaded via its md5 sum.
 
-[![Build Status](https://travis-ci.org/JosuaKrause/curl_chk.svg?branch=master)](https://travis-ci.org/JosuaKrause/curl_chk)
+[![Build Status](https://travis-ci.org/JosuaKrause/curl-chk.svg?branch=master)](https://travis-ci.org/JosuaKrause/curl-chk)
 
 Currently only one file at a time is allowed. The local
 name of this file has to be specified via `-o` and the
