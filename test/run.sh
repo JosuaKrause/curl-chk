@@ -74,4 +74,6 @@ check_file "a.test" "${TEST_DIR}/a.tmp"
 
 echo "cleaning up"
 rm -r -- "${TEST_DIR}"
+
+echo "all tests were successful!"
 exit 0

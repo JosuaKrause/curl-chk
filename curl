@@ -1,6 +1,10 @@
 #!/bin/bash
 
 REAL_CURL='curl'
+USE_MD5SUM=
+if [ `command -v md5 2>/dev/null 1>&2; echo $?` != 0 ]; then
+  USE_MD5SUM=1
+fi
 
 last_arg=
 url_pattern='[#\?](.*\&)*md5=([0-9a-fA-F]+)'
@@ -101,7 +105,11 @@ fi
 
 if [ ! -z "${md5_sum}" ] && [ -f "${output_file}" ]; then
   echo "verifying file ${output_file} to have md5: '${md5_sum}'"
-  md5_cmp=`md5 -q "${output_file}"`
+  if [ -z $USE_MD5SUM ]; then
+    md5_cmp=`md5 -q "${output_file}"`
+  else
+    md5_cmp=`md5sum "${output_file}"`
+  fi
   echo "${md5_cmp}" | xargs test "${md5_sum}" =
   if [ $? != 0 ]; then
     echo "invalid md5 sum!"
