@@ -35,12 +35,18 @@ check_file() {
   fi
 }
 
+num_tests=0
+begin_test() {
+  ((num_tests++))
+  echo "test ${num_tests}"
+}
+
 md5_a="d8e8fca2dc0f896fd7cb4cb0031ba249"
 md5_b="95b3644556b48a25f3366d82b0e3b349"
 
 ## using explicit --md5
 # correct verification
-echo "test 1"
+begin_test
 ../curl -# -o "${TEST_DIR}/a.tmp" --md5 "${md5_a}" "${GITHUB_PREFIX}/a.test" > "${STD_OUT}"
 check_exit $? 0
 check_file "a.test" "${TEST_DIR}/a.tmp"
@@ -50,14 +56,14 @@ rm -- "${STD_OUT}"
 check_exit $x 0
 
 # wrong md5 sum
-echo "test 2"
+begin_test
 ../curl -# -o "${TEST_DIR}/b.tmp" --md5 "${md5_a}" "${GITHUB_PREFIX}/b.test"
 check_exit $? 69
 check_file "b.test" "${TEST_DIR}/b.tmp"
 
 ## using URL fragment
 # correct verification
-echo "test 3"
+begin_test
 ../curl -# -o "${TEST_DIR}/b.tmp" --url "${GITHUB_PREFIX}/b.test#md5=${md5_b}" > "${STD_OUT}"
 check_exit $? 0
 check_file "b.test" "${TEST_DIR}/b.tmp"
@@ -67,7 +73,7 @@ rm -- "${STD_OUT}"
 check_exit $x 0
 
 # wrong md5 sum
-echo "test 4"
+begin_test
 ../curl -# -o "${TEST_DIR}/a.tmp" --url "${GITHUB_PREFIX}/a.test#md5=${md5_b}"
 check_exit $? 69
 check_file "a.test" "${TEST_DIR}/a.tmp"
