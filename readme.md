@@ -22,4 +22,4 @@ You can use the wrapper either directly or by renaming
 the original, changing `REAL_CURL` in the script, and
 moving the script into path.
 
-Pull requests are welcome!
+Pull requests are highly appreciated!

@@ -108,7 +108,7 @@ if [ ! -z "${md5_sum}" ] && [ -f "${output_file}" ]; then
   if [ -z $USE_MD5SUM ]; then
     md5_cmp=`md5 -q "${output_file}"`
   else
-    md5_cmp=`md5sum "${output_file}"`
+    md5_cmp=`md5sum "${output_file}" | sed -E 's/^([0-9a-fA-F]+)($|[^0-9a-fA-F].*$)/\1/'`
   fi
   echo "${md5_cmp}" | xargs test "${md5_sum}" =
   if [ $? != 0 ]; then
