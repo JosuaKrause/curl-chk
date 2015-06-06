@@ -31,10 +31,10 @@ run() {
 }
 
 check_exit() {
-  if [ -f "${STD_ERR}" ]; then
-    cat "${STD_ERR}"
-  fi
   if [ $1 != $2 ]; then
+    if [ -f "${STD_ERR}" ]; then
+      cat "${STD_ERR}"
+    fi
     echo "^ unexpected exit status! expected $2 got $1 ^"
     exit 1
   fi
@@ -52,7 +52,7 @@ check_file() {
 num_tests=0
 begin_test() {
   num_tests=$((num_tests+1))
-  echo "NOTICE: test ${num_tests}"
+  echo "NOTICE: running test ${num_tests}"
 }
 
 md5_a="d8e8fca2dc0f896fd7cb4cb0031ba249"
