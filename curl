@@ -6,114 +6,183 @@ if [ `command -v md5 2>/dev/null 1>&2; echo $?` != 0 ]; then
   USE_MD5SUM=1
 fi
 
-last_arg=
 url_pattern='[#\?](.*\&)*md5=([0-9a-fA-F]+)'
 
 usage() {
   $REAL_CURL "$@"
   local x=$?
-  echo <<EOF
-This wrapper of curl will verify the contents of URLs specified with --url using
-the md5 sum of the output file which must be specified using -o. This only works
-for single files without filename patterns. The expected md5 sum can either be
-passed with --md5 or can be defined in the URL via the following regex:
+  cat <<EOF
+     --quiet         Indicate checksum results only in status code (42 if fail)
+This wrapper of curl will verify the contents of URLs using the md5 sum of
+output files which must be specified using -o. This only works for single files
+without filename patterns. The expected md5 sum can either be passed with --md5
+or can be part of the URLs via the following regex:
 EOF
-  echo "/${url_pattern}/"
+  echo "  /${url_pattern}/"
   echo "Explicit md5 sums via --md5 take higher precedence."
   return $x
 }
 
-array_contains() {
-  last_arg=
-  local request=$1; shift
-  local seeking=$1; shift
-  local in=1
-  local fin=0
-  for element; do
-    if [ $fin != 0 ]; then
-      last_arg="${element}"
-      fin=0
-      break
+quiet=
+auto_file=
+
+cur_url=
+cur_out=
+cur_md5=
+list_out=()
+list_md5=()
+
+check_file() {
+  local output_file="$1"; shift
+  local md5_sum="$1"; shift
+  local ret=0
+  if [ -f "${output_file}" ]; then
+    if [ -z $USE_MD5SUM ]; then
+      md5_cmp=`md5 -q "${output_file}"`
+    else
+      md5_cmp=`md5sum "${output_file}" | sed -E 's/^([0-9a-fA-F]+)($|[^0-9a-fA-F].*$)/\1/'`
     fi
-    if [ "${element}" == "${seeking}" ]; then
-      in=0
-      if [ $request == 0 ]; then
-        break
-      else
-        fin=1
-      fi
+    local ok="OK"
+    if [ "${md5_sum}" != "${md5_cmp}" ]; then
+      ret=42
+      ok="FAILED"
     fi
-  done
-  if [ $fin != 0 ]; then
-    usage "--help"
-    echo "Error: expected argument after ${seeking}"
-    exit 42
+    if [ -z "${quiet}" ]; then
+      echo "${output_file}: ${ok} ${md5_sum}" 1>&2
+    fi
+  else
+    echo "Internal error: Invalid output file '${output_file}'" 1>&2
+    exit 98
   fi
-  return $in
+  return $ret
 }
 
-args=("$@")
+check_list() {
+  local ret=0
+  local total="${#list_out[*]}"
+  local no_match=0
+  local ix=0
+  while [ "${ix}" -lt "${total}" ]; do
+    check_file "${list_out[$ix]}" "${list_md5[$ix]}"
+    local x=$?
+    if [ $x != 0 ]; then
+      ret=$x
+      no_match=$((no_match+1))
+    fi
+    ix=$((ix+1))
+  done
+  if [ $ret != 0 ] && [ -z "${quiet}" ]; then
+    echo "WARNING: ${no_match} of ${total} computed checksums did NOT match" 1>&2
+  fi
+  return $ret
+}
 
-array_contains 0 "--help" "${args[@]}"
-if [ $? == 0 ]; then
+add_to_list() {
+  if [ ! -z "${cur_url}" ]; then
+    if [ -z "${cur_md5}" ]; then
+      local pattern="^.*${url_pattern}[^\/]*\$"
+      cur_md5=`echo "${cur_url}" | grep -E "${pattern}" | sed -E "s/${pattern}/\2/"`
+    fi
+    if [ ! -z "${auto_file}" ] && [ -z "${cur_out}" ]; then
+      local pattern="\/([^/]+)\$"
+      cur_out=`echo "${cur_url}" | grep -oE "${pattern}" | sed -E "s/${pattern}/\1/"`
+    fi
+  fi
+  if [ ! -z "${cur_out}" ] && [ ! -z "${cur_md5}" ]; then
+    list_out+=("${cur_out}")
+    list_md5+=("${cur_md5}")
+  fi
+  cur_url=
+  cur_out=
+  cur_md5=
+}
+
+set_cur() {
+  local field="$1"; shift
+  local value="$1"; shift
+  case "${field}" in
+    url)
+      if [ ! -z "${cur_url}" ]; then
+        add_to_list
+      fi
+      cur_url="${value}"
+      ;;
+    out)
+      if [ ! -z "${cur_out}" ]; then
+        add_to_list
+      fi
+      cur_out="${value}"
+      ;;
+    md5)
+      if [ ! -z "${cur_md5}" ]; then
+        add_to_list
+      fi
+      cur_md5="${value}"
+      ;;
+    *)
+      echo "Internal error: Illegal field ${field}" 1>&2
+      exit 99
+      ;;
+  esac
+}
+
+args=()
+print_usage=
+while [ $# -gt 0 ]; do
+  no_preserve_arg=
+  case "$1" in
+  -h|--help) # flag for usage
+    print_usage="print_usage"
+    ;;
+  --quiet) # flag for quiet mode
+    quiet="quiet"
+    no_preserve_arg="no_preserve_arg"
+    ;;
+  --md5) # explicit md5 argument
+    shift
+    set_cur md5 "$1"
+    no_preserve_arg="no_preserve_arg"
+    ;;
+  --url) # explicit URL argument
+    args+=("$1")
+    shift
+    set_cur url "$1"
+    ;;
+  -o|--output) # explicit output argument
+    args+=("$1")
+    shift
+    set_cur out "$1"
+    ;;
+  -O|--remote-name|--remote-name-all) # automatic file name inference
+    auto_file="auto_file"
+    ;;
+  -*) # arbitrary arguments
+    ;;
+  *) # url
+    set_cur url "$1"
+    ;;
+  esac
+  if [ -z "$no_preserve_arg" ]; then
+    args+=("$1")
+  fi
+  shift
+done
+
+# clear current variables
+add_to_list
+
+# only show usage?
+if [ ! -z "${print_usage}" ]; then
   usage "${args[@]}"
   exit $?
 fi
 
-md5_sum=
-output_file=
-
-array_contains 1 "--md5" "${args[@]}"
-if [ $? == 0 ]; then
-  md5_sum="${last_arg}"
-  # remove --md5
-  arr=()
-  hold=0
-  for cur in "${args[@]}" ; do
-    if [ "${cur}" == "--md5" ]; then
-      hold=1
-    elif [ $hold != 0 ]; then
-      hold=0
-    else
-      arr+=("${cur}")
-    fi
-  done
-  args=("${arr[@]}")
-else
-  # try parsing the URL from --url
-  array_contains 1 "--url" "${args[@]}"
-  if [ $? == 0 ]; then
-    url="${last_arg}"
-    md5_sum=`echo "${url}" | sed -E "s/^.*${url_pattern}[^\/]*\$/\2/"`
-  fi
-fi
-
-array_contains 1 "-o" "${args[@]}"
-if [ $? == 0 ]; then
-  output_file="${last_arg}"
-else
-  array_contains 1 "--output" "${args[@]}"
-  if [ $? == 0 ]; then
-    output_file="${last_arg}"
-  fi
-fi
-
+# execute the original curl
 $REAL_CURL "${args[@]}"
 if [ $? != 0 ]; then
   exit $?
 fi
 
-if [ ! -z "${md5_sum}" ] && [ -f "${output_file}" ]; then
-  echo "verifying file ${output_file} to have md5: '${md5_sum}'"
-  if [ -z $USE_MD5SUM ]; then
-    md5_cmp=`md5 -q "${output_file}"`
-  else
-    md5_cmp=`md5sum "${output_file}" | sed -E 's/^([0-9a-fA-F]+)($|[^0-9a-fA-F].*$)/\1/'`
-  fi
-  echo "${md5_cmp}" | xargs test "${md5_sum}" =
-  if [ $? != 0 ]; then
-    echo "invalid md5 sum!"
-    echo "expected ${md5_sum} got ${md5_cmp}"
-    exit 69
-  fi
-fi
+# check md5 for files
+check_list
+exit $?
