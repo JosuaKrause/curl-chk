@@ -84,7 +84,7 @@ add_to_list() {
       cur_md5=`echo "${cur_url}" | grep -E "${pattern}" | sed -E "s/${pattern}/\2/"`
     fi
     if [ ! -z "${auto_file}" ] && [ -z "${cur_out}" ]; then
-      local pattern="\/([^/]+)\$"
+      local pattern="\/([^/#]+)(#|\$)"
       cur_out=`echo "${cur_url}" | grep -oE "${pattern}" | sed -E "s/${pattern}/\1/"`
     fi
   fi
@@ -130,6 +130,7 @@ args=()
 print_usage=
 while [ $# -gt 0 ]; do
   no_preserve_arg=
+  remove_fragment=
   case "$1" in
   -h|--help) # flag for usage
     print_usage="print_usage"
@@ -147,6 +148,7 @@ while [ $# -gt 0 ]; do
     args+=("$1")
     shift
     set_cur url "$1"
+    remove_fragment="remove_fragment"
     ;;
   -o|--output) # explicit output argument
     args+=("$1")
@@ -160,10 +162,16 @@ while [ $# -gt 0 ]; do
     ;;
   *) # url
     set_cur url "$1"
+    remove_fragment="remove_fragment"
     ;;
   esac
+  arg="$1"
+  if [ ! -z "${remove_fragment}" ]; then
+    # remove the fragment part to ensure the correct name when using -O
+    arg=`echo "${arg}" | sed -E "s/#.*$//"`
+  fi
   if [ -z "$no_preserve_arg" ]; then
-    args+=("$1")
+    args+=("$arg")
   fi
   shift
 done

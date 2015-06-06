@@ -112,10 +112,10 @@ run "../${STD_ERR}" ../../curl -# --remote-name-all "${GITHUB_PREFIX}/a.test#md5
 x=$?
 cd ".."
 check_exit $x 0
-check_file "a.test" "${TEST_DIR}/a.test#md5=${md5_a}"
+check_file "a.test" "${TEST_DIR}/a.test"
 check_file "b.test" "${TEST_DIR}/b.test?md5=${md5_b}"
 run "-" cat "${STD_ERR}"
-run "-" grep -q "a.test#md5=${md5_a}: OK ${md5_a}" "${STD_ERR}"
+run "-" grep -q "a.test: OK ${md5_a}" "${STD_ERR}"
 check_exit $? 0
 run "-" grep -q "b.test?md5=${md5_b}: OK ${md5_b}" "${STD_ERR}"
 check_exit $? 0

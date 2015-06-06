@@ -24,9 +24,6 @@ Example calls:
 ./curl -O "http://example.com/index.html#md5=09b9c392dc1f6e914cea287cb6be34b0"
 ```
 
-Note that `-O` in the example saves the file as `index.html#md5=09b9c392dc1f6e914cea287cb6be34b0`.
-You can use `--md5` to avoid this.
-
 You can use the wrapper either directly or by renaming
 the original, changing `REAL_CURL` in the script, and
 moving the script into path.
