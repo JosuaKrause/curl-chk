@@ -88,7 +88,7 @@ run "${STD_ERR}" "-" ../curl -# -o "${TEST_DIR}/b.tmp" --md5 "${md5_a}" "${GITHU
 check_exit $? 42
 check_file "b.test" "${TEST_DIR}/b.tmp"
 run "-" "-" cat "${STD_ERR}"
-run "-" "-" grep -q "${TEST_DIR}/b.tmp: FAILED ${md5_a}" "${STD_ERR}"
+run "-" "-" grep -q "${TEST_DIR}/b.tmp: FAILED ${md5_b}" "${STD_ERR}"
 check_exit $? 0
 run "-" "-" grep -q "WARNING: 1 of 1 computed checksums did NOT match" "${STD_ERR}"
 check_exit $? 0
@@ -111,7 +111,7 @@ run "${STD_ERR}" "-" ../curl -# -o "${TEST_DIR}/a.tmp" --url "${GITHUB_PREFIX}/a
 check_exit $? 42
 check_file "a.test" "${TEST_DIR}/a.tmp"
 run "-" "-" cat "${STD_ERR}"
-run "-" "-" grep -q "${TEST_DIR}/a.tmp: FAILED ${md5_b}" "${STD_ERR}"
+run "-" "-" grep -q "${TEST_DIR}/a.tmp: FAILED ${md5_a}" "${STD_ERR}"
 check_exit $? 0
 run "-" "-" grep -q "WARNING: 1 of 1 computed checksums did NOT match" "${STD_ERR}"
 check_exit $? 0
@@ -134,6 +134,24 @@ run "-" "-" grep -q "b.test?md5=${md5_b}: OK ${md5_b}" "${STD_ERR}"
 check_exit $? 0
 rm -- "${STD_ERR}"
 
+# partial verification - multiple files
+begin_test
+cd "${TEST_DIR}"
+run "../${STD_ERR}" "-" ../../curl -# --remote-name-all "${GITHUB_PREFIX}/a.test#md5=${md5_a}" "${GITHUB_PREFIX}/b.test" --md5 "${md5_a}"
+x=$?
+cd ".."
+check_exit $x 0
+check_file "a.test" "${TEST_DIR}/a.test"
+check_file "b.test" "${TEST_DIR}/b.test"
+run "-" "-" cat "${STD_ERR}"
+run "-" "-" grep -q "a.test: OK ${md5_a}" "${STD_ERR}"
+check_exit $? 0
+run "-" "-" grep -q "b.test: FAILED ${md5_a}" "${STD_ERR}"
+check_exit $? 0
+run "-" "-" grep -q "WARNING: 1 of 2 computed checksums did NOT match" "${STD_ERR}"
+check_exit $? 0
+rm -- "${STD_ERR}"
+
 ## omitting output parameter
 # correct verification
 begin_test
@@ -144,6 +162,7 @@ run "-" "-" cat "${STD_ERR}"
 run "-" "-" grep -q "STDOUT: OK ${md5_a}" "${STD_ERR}"
 check_exit $? 0
 rm -- "${STD_ERR}"
+rm -- "${STD_OUT}"
 
 # wrong md5 sum
 begin_test
@@ -151,11 +170,12 @@ run "${STD_ERR}" "${STD_OUT}" ../curl -# "${GITHUB_PREFIX}/b.test#md5=${md5_a}"
 check_exit $? 42
 check_file "/dev/null" "${STD_OUT}"
 run "-" "-" cat "${STD_ERR}"
-run "-" "-" grep -q "STDOUT: FAILED ${md5_a}" "${STD_ERR}"
+run "-" "-" grep -q "STDOUT: FAILED ${md5_b}" "${STD_ERR}"
 check_exit $? 0
 run "-" "-" grep -q "WARNING: 1 of 1 computed checksums did NOT match" "${STD_ERR}"
 check_exit $? 0
 rm -- "${STD_ERR}"
+rm -- "${STD_OUT}"
 
 echo "NOTICE: cleaning up"
 rm -r -- "${TEST_DIR}"

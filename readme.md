@@ -15,6 +15,7 @@ The results of the integrity check are printed to *stderr* in the format:
 WARNING: 1 of 2 computed checksums did NOT match
 ```
 
+The shown checksums are the actual checksums of the downloaded files.
 The warning line only appears if at least one of the checks failed.
 
 Example calls:

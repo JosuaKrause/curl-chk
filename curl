@@ -50,6 +50,7 @@ make_temp_file() {
 check_file() {
   local output_file="$1"; shift
   local md5_sum="$1"; shift
+  local md5_cmp=
   local ret=0
   if [ -f "${output_file}" ]; then
     if [ -z $USE_MD5SUM ]; then
@@ -67,7 +68,7 @@ check_file() {
       if [ "${output_file}" == "${temp_file}" ]; then
         name="STDOUT"
       fi
-      echo "${name}: ${ok} ${md5_sum}" 1>&2
+      echo "${name}: ${ok} ${md5_cmp}" 1>&2
     fi
   else
     echo "Internal error: Invalid output file '${output_file}'" 1>&2
