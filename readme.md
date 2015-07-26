@@ -21,7 +21,7 @@ The warning line only appears if at least one of the checks failed.
 Example calls:
 ```bash
 ./curl "http://example.com/#md5=09b9c392dc1f6e914cea287cb6be34b0" -o "index.html"
-./curl --md5 09b9c392dc1f6e914cea287cb6be34b0 -o "index.html" "http://example.com/"
+./curl --digest md5=09b9c392dc1f6e914cea287cb6be34b0 -o "index.html" "http://example.com/"
 ./curl -O "http://example.com/index.html#md5=09b9c392dc1f6e914cea287cb6be34b0"
 ./curl "http://example.com/#md5=09b9c392dc1f6e914cea287cb6be34b0"
 ```

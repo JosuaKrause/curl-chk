@@ -71,10 +71,10 @@ begin_test() {
 md5_a="d8e8fca2dc0f896fd7cb4cb0031ba249"
 md5_b="95b3644556b48a25f3366d82b0e3b349"
 
-## using explicit --md5
+## using explicit --digest
 # correct verification
 begin_test
-run "${STD_ERR}" "-" ../curl -# -o "${TEST_DIR}/a.tmp" --md5 "${md5_a}" "${GITHUB_PREFIX}/a.test"
+run "${STD_ERR}" "-" ../curl -# -o "${TEST_DIR}/a.tmp" --digest "md5=${md5_a}" "${GITHUB_PREFIX}/a.test"
 check_exit $? 0
 check_file "a.test" "${TEST_DIR}/a.tmp"
 run "-" "-" cat "${STD_ERR}"
@@ -84,7 +84,7 @@ rm -- "${STD_ERR}"
 
 # wrong md5 sum
 begin_test
-run "${STD_ERR}" "-" ../curl -# -o "${TEST_DIR}/b.tmp" --md5 "${md5_a}" "${GITHUB_PREFIX}/b.test"
+run "${STD_ERR}" "-" ../curl -# -o "${TEST_DIR}/b.tmp" --digest "md5=${md5_a}" "${GITHUB_PREFIX}/b.test"
 check_exit $? 42
 check_file "b.test" "${TEST_DIR}/b.tmp"
 run "-" "-" cat "${STD_ERR}"
@@ -137,7 +137,7 @@ rm -- "${STD_ERR}"
 # partial verification - multiple files
 begin_test
 cd "${TEST_DIR}"
-run "../${STD_ERR}" "-" ../../curl -# --remote-name-all "${GITHUB_PREFIX}/a.test#md5=${md5_a}" "${GITHUB_PREFIX}/b.test" --md5 "${md5_a}"
+run "../${STD_ERR}" "-" ../../curl -# --remote-name-all "${GITHUB_PREFIX}/a.test#md5=${md5_a}" "${GITHUB_PREFIX}/b.test" --digest "md5=${md5_a}"
 x=$?
 cd ".."
 check_exit $x 42

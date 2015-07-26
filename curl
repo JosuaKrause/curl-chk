@@ -15,11 +15,11 @@ usage() {
      --quiet         Indicate checksum results only in status code (42 if fail)
 This wrapper of curl will verify the contents of URLs using the md5 sum of
 output files which must be specified using -o. This only works for single files
-without filename patterns. The expected md5 sum can either be passed with --md5
-or can be part of the URLs via the following regex:
+without filename patterns. The expected md5 sum can either be passed with
+--digest or can be part of the URLs via the following regex:
 EOF
   echo "  /${url_pattern}/"
-  echo "Explicit md5 sums via --md5 take higher precedence."
+  echo "Explicit md5 sums via --digest take higher precedence."
   return $x
 }
 
@@ -43,7 +43,7 @@ make_temp_file() {
     echo "Internal error: Could not create temp file" 1>&2
     exit 97
   fi
-  trap 'rm -rf -- "${temp_file}" 2> /dev/null' EXIT
+  trap 'rm -rf -- "${temp_file}" 2>/dev/null' EXIT
   return 0
 }
 
@@ -165,9 +165,9 @@ while [ $# -gt 0 ]; do
     quiet="quiet"
     no_preserve_arg="no_preserve_arg"
     ;;
-  --md5) # explicit md5 argument
+  --digest) # explicit digest argument
     shift
-    set_cur md5 "$1"
+    set_cur md5 `echo "$1" | sed "s/^md5=//"`
     no_preserve_arg="no_preserve_arg"
     ;;
   --url) # explicit URL argument
