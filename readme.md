@@ -26,7 +26,7 @@ Example calls:
 ```
 
 Note that if an output parameter is omitted the fetched content will be printed
-to STD_OUT iff the verification was successful. This allows for a secure version
+to *stdout* iff the verification was successful. This allows for a secure version
 of the rather common pattern of piping a downloaded script to `sh`:
 
 ```bash
