@@ -38,7 +38,7 @@ make_temp_file() {
     return 1
   fi
   local prefix=`basename $0`
-  temp_file=`mktemp -t "${prefix}" -q`
+  temp_file=`mktemp -t "${prefix}"`
   if [ $? -ne 0 ]; then
     echo "Internal error: Could not create temp file" 1>&2
     exit 97
