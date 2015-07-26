@@ -5,7 +5,6 @@ language: c
 sudo: false
 env:
   - TEST_MODE=run_tests
-  - TMPDIR=test/out/
 install: true
 script: test/run.sh
 notifications:
