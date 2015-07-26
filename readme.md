@@ -30,7 +30,7 @@ to *stdout* iff the verification was successful. This allows for a secure versio
 of the rather common pattern of piping a downloaded script to `sh`:
 
 ```bash
-./curl "http://fancytool.com/installer#md5=09b9c392dc1f6e914cea287cb6be34b0 | sh"
+./curl "http://fancytool.com/installer#md5=09b9c392dc1f6e914cea287cb6be34b0" | sh
 ```
 
 You can use the wrapper either directly or by renaming
