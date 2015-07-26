@@ -13,10 +13,9 @@ usage() {
   local x=$?
   cat <<EOF
      --quiet         Indicate checksum results only in status code (42 if fail)
-This wrapper of curl will verify the contents of URLs using the md5 sum of
-output files which must be specified using -o. This only works for single files
-without filename patterns. The expected md5 sum can either be passed with
---digest or can be part of the URLs via the following regex:
+This wrapper of curl will verify the contents of URLs using the md5 sum of their
+content. The expected md5 sum can either be passed with --digest or can be part
+of the URLs via the following regex:
 EOF
   echo "  /${url_pattern}/"
   echo "Explicit md5 sums via --digest take higher precedence."

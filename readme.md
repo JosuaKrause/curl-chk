@@ -6,7 +6,7 @@ of the actual files that were downloaded via their md5 sums.
 [![Build Status](https://travis-ci.org/JosuaKrause/curl-chk.svg?branch=master)](https://travis-ci.org/JosuaKrause/curl-chk)
 
 The md5 sum can either be passed as part of the URL or explicitely as
-argument `--md5`. All other arguments are used as is and as specified by curl.
+argument `--digest`. All other arguments are used as is and as specified by curl.
 The results of the integrity check are printed to *stderr* in the format:
 
 ```
@@ -31,7 +31,7 @@ to *stdout* iff the verification was successful. This allows for a secure versio
 of the rather common pattern of piping a downloaded script to `sh`:
 
 ```bash
-./curl "http://fancytool.com/installer#md5=09b9c392dc1f6e914cea287cb6be34b0" | sh
+./curl http://fancytool.com/installer#md5=e17f840d197c47df3e6d5b3bc4ca4ff4 | sh
 ```
 
 You can use the wrapper either directly or by renaming
