@@ -32,6 +32,21 @@ cur_md5=
 list_out=()
 list_md5=()
 
+temp_file=
+make_temp_file() {
+  if [ ! -z "${temp_file}" ]; then
+    return 1
+  fi
+  local prefix=`basename $0`
+  temp_file=`mktemp -t "${prefix}" -q`
+  if [ $? -ne 0 ]; then
+    echo "Internal error: Could not create temp file" 1>&2
+    exit 97
+  fi
+  trap 'rm -rf -- "${temp_file}" 2> /dev/null' EXIT
+  return 0
+}
+
 check_file() {
   local output_file="$1"; shift
   local md5_sum="$1"; shift
@@ -48,7 +63,11 @@ check_file() {
       ok="FAILED"
     fi
     if [ -z "${quiet}" ]; then
-      echo "${output_file}: ${ok} ${md5_sum}" 1>&2
+      local name="${output_file}"
+      if [ "${output_file}" == "${temp_file}" ]; then
+        name="STDOUT"
+      fi
+      echo "${name}: ${ok} ${md5_sum}" 1>&2
     fi
   else
     echo "Internal error: Invalid output file '${output_file}'" 1>&2
@@ -88,9 +107,15 @@ add_to_list() {
       cur_out=`echo "${cur_url}" | grep -oE "${pattern}" | sed -E "s/${pattern}/\1/"`
     fi
   fi
-  if [ ! -z "${cur_out}" ] && [ ! -z "${cur_md5}" ]; then
-    list_out+=("${cur_out}")
-    list_md5+=("${cur_md5}")
+  if [ ! -z "${cur_md5}" ]; then
+    if [ ! -z "${cur_out}" ]; then
+      list_out+=("${cur_out}")
+      list_md5+=("${cur_md5}")
+    else
+      make_temp_file
+      list_out+=("${temp_file}")
+      list_md5+=("${cur_md5}")
+    fi
   fi
   cur_url=
   cur_out=
@@ -186,11 +211,20 @@ if [ ! -z "${print_usage}" ]; then
 fi
 
 # execute the original curl
-$REAL_CURL "${args[@]}"
+if [ -z "${temp_file}" ]; then
+  $REAL_CURL "${args[@]}"
+else
+  $REAL_CURL "${args[@]}" > "${temp_file}"
+fi
+
 if [ $? != 0 ]; then
   exit $?
 fi
 
 # check md5 for files
 check_list
-exit $?
+check_result=$?
+if [ ! -z "${temp_file}" ] && [ $check_result == 0 ]; then
+  cat "${temp_file}"
+fi
+exit $check_result

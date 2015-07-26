@@ -22,6 +22,15 @@ Example calls:
 ./curl "http://example.com/#md5=09b9c392dc1f6e914cea287cb6be34b0" -o "index.html"
 ./curl --md5 09b9c392dc1f6e914cea287cb6be34b0 -o "index.html" "http://example.com/"
 ./curl -O "http://example.com/index.html#md5=09b9c392dc1f6e914cea287cb6be34b0"
+./curl "http://example.com/#md5=09b9c392dc1f6e914cea287cb6be34b0"
+```
+
+Note that if an output parameter is omitted the fetched content will be printed
+to STD_OUT iff the verification was successful. This allows for a secure version
+of the rather common pattern of piping a downloaded script to `sh`:
+
+```bash
+./curl "http://fancytool.com/installer#md5=09b9c392dc1f6e914cea287cb6be34b0 | sh"
 ```
 
 You can use the wrapper either directly or by renaming

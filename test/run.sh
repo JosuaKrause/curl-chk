@@ -3,6 +3,7 @@
 cd "$(dirname $0)"
 
 TEST_DIR="./out"
+STD_OUT="${TEST_DIR}/out.tmp"
 STD_ERR="${TEST_DIR}/err.tmp"
 GITHUB_USER="JosuaKrause"
 GITHUB_REPO="curl_chk"
@@ -18,14 +19,26 @@ fi
 
 run() {
   local err="$1"; shift
+  local out="$1"; shift
   local ret=1
   echo "NOTICE: $@"
-  if [ "${err}" == "-" ]; then
-    "$@"
-    ret=$?
+  if [ "${out}" == "-" ]; then
+    if [ "${err}" == "-" ]; then
+      "$@"
+      ret=$?
+    else
+      "$@" 2> "${err}"
+      ret=$?
+    fi
   else
-    "$@" 2> "${err}"
-    ret=$?
+    if [ "${err}" == "-" ]; then
+      "$@" 1> "${out}"
+      ret=$?
+    else
+      "$@" 1> "${out}" 2> "${err}"
+      ret=$?
+    fi
+    cat "${out}"
   fi
   return $ret
 }
@@ -61,46 +74,46 @@ md5_b="95b3644556b48a25f3366d82b0e3b349"
 ## using explicit --md5
 # correct verification
 begin_test
-run "${STD_ERR}" ../curl -# -o "${TEST_DIR}/a.tmp" --md5 "${md5_a}" "${GITHUB_PREFIX}/a.test"
+run "${STD_ERR}" "-" ../curl -# -o "${TEST_DIR}/a.tmp" --md5 "${md5_a}" "${GITHUB_PREFIX}/a.test"
 check_exit $? 0
 check_file "a.test" "${TEST_DIR}/a.tmp"
-run "-" cat "${STD_ERR}"
-run "-" grep -q "${TEST_DIR}/a.tmp: OK ${md5_a}" "${STD_ERR}"
+run "-" "-" cat "${STD_ERR}"
+run "-" "-" grep -q "${TEST_DIR}/a.tmp: OK ${md5_a}" "${STD_ERR}"
 check_exit $? 0
 rm -- "${STD_ERR}"
 
 # wrong md5 sum
 begin_test
-run "${STD_ERR}" ../curl -# -o "${TEST_DIR}/b.tmp" --md5 "${md5_a}" "${GITHUB_PREFIX}/b.test"
+run "${STD_ERR}" "-" ../curl -# -o "${TEST_DIR}/b.tmp" --md5 "${md5_a}" "${GITHUB_PREFIX}/b.test"
 check_exit $? 42
 check_file "b.test" "${TEST_DIR}/b.tmp"
-run "-" cat "${STD_ERR}"
-run "-" grep -q "${TEST_DIR}/b.tmp: FAILED ${md5_a}" "${STD_ERR}"
+run "-" "-" cat "${STD_ERR}"
+run "-" "-" grep -q "${TEST_DIR}/b.tmp: FAILED ${md5_a}" "${STD_ERR}"
 check_exit $? 0
-run "-" grep -q "WARNING: 1 of 1 computed checksums did NOT match" "${STD_ERR}"
+run "-" "-" grep -q "WARNING: 1 of 1 computed checksums did NOT match" "${STD_ERR}"
 check_exit $? 0
 rm -- "${STD_ERR}"
 
 ## using URL fragment
 # correct verification
 begin_test
-run "${STD_ERR}" ../curl -# -o "${TEST_DIR}/b.tmp" --url "${GITHUB_PREFIX}/b.test#md5=${md5_b}"
+run "${STD_ERR}" "-" ../curl -# -o "${TEST_DIR}/b.tmp" --url "${GITHUB_PREFIX}/b.test#md5=${md5_b}"
 check_exit $? 0
 check_file "b.test" "${TEST_DIR}/b.tmp"
-run "-" cat "${STD_ERR}"
-run "-" grep -q "${TEST_DIR}/b.tmp: OK ${md5_b}" "${STD_ERR}"
+run "-" "-" cat "${STD_ERR}"
+run "-" "-" grep -q "${TEST_DIR}/b.tmp: OK ${md5_b}" "${STD_ERR}"
 check_exit $? 0
 rm -- "${STD_ERR}"
 
 # wrong md5 sum
 begin_test
-run "${STD_ERR}" ../curl -# -o "${TEST_DIR}/a.tmp" --url "${GITHUB_PREFIX}/a.test#md5=${md5_b}"
+run "${STD_ERR}" "-" ../curl -# -o "${TEST_DIR}/a.tmp" --url "${GITHUB_PREFIX}/a.test#md5=${md5_b}"
 check_exit $? 42
 check_file "a.test" "${TEST_DIR}/a.tmp"
-run "-" cat "${STD_ERR}"
-run "-" grep -q "${TEST_DIR}/a.tmp: FAILED ${md5_b}" "${STD_ERR}"
+run "-" "-" cat "${STD_ERR}"
+run "-" "-" grep -q "${TEST_DIR}/a.tmp: FAILED ${md5_b}" "${STD_ERR}"
 check_exit $? 0
-run "-" grep -q "WARNING: 1 of 1 computed checksums did NOT match" "${STD_ERR}"
+run "-" "-" grep -q "WARNING: 1 of 1 computed checksums did NOT match" "${STD_ERR}"
 check_exit $? 0
 rm -- "${STD_ERR}"
 
@@ -108,16 +121,39 @@ rm -- "${STD_ERR}"
 # correct verification - multiple files
 begin_test
 cd "${TEST_DIR}"
-run "../${STD_ERR}" ../../curl -# --remote-name-all "${GITHUB_PREFIX}/a.test#md5=${md5_a}" "${GITHUB_PREFIX}/b.test?md5=${md5_b}"
+run "../${STD_ERR}" "-" ../../curl -# --remote-name-all "${GITHUB_PREFIX}/a.test#md5=${md5_a}" "${GITHUB_PREFIX}/b.test?md5=${md5_b}"
 x=$?
 cd ".."
 check_exit $x 0
 check_file "a.test" "${TEST_DIR}/a.test"
 check_file "b.test" "${TEST_DIR}/b.test?md5=${md5_b}"
-run "-" cat "${STD_ERR}"
-run "-" grep -q "a.test: OK ${md5_a}" "${STD_ERR}"
+run "-" "-" cat "${STD_ERR}"
+run "-" "-" grep -q "a.test: OK ${md5_a}" "${STD_ERR}"
 check_exit $? 0
-run "-" grep -q "b.test?md5=${md5_b}: OK ${md5_b}" "${STD_ERR}"
+run "-" "-" grep -q "b.test?md5=${md5_b}: OK ${md5_b}" "${STD_ERR}"
+check_exit $? 0
+rm -- "${STD_ERR}"
+
+## omitting output parameter
+# correct verification
+begin_test
+run "${STD_ERR}" "${STD_OUT}" ../curl -# "${GITHUB_PREFIX}/a.test#md5=${md5_a}"
+check_exit $? 0
+check_file "a.test" "${STD_OUT}"
+run "-" "-" cat "${STD_ERR}"
+run "-" "-" grep -q "STDOUT: OK ${md5_a}" "${STD_ERR}"
+check_exit $? 0
+rm -- "${STD_ERR}"
+
+# wrong md5 sum
+begin_test
+run "${STD_ERR}" "${STD_OUT}" ../curl -# "${GITHUB_PREFIX}/b.test#md5=${md5_a}"
+check_exit $? 42
+check_file "/dev/null" "${STD_OUT}"
+run "-" "-" cat "${STD_ERR}"
+run "-" "-" grep -q "STDOUT: FAILED ${md5_a}" "${STD_ERR}"
+check_exit $? 0
+run "-" "-" grep -q "WARNING: 1 of 1 computed checksums did NOT match" "${STD_ERR}"
 check_exit $? 0
 rm -- "${STD_ERR}"
 
