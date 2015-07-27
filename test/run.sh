@@ -203,7 +203,7 @@ x=$?
 if [ ! -z $NO_PYTHON ] && [ $NO_PYTHON != 0 ]; then
   check_exit $x 94
   run "-" "-" cat "${STD_ERR}"
-  run "-" "-" grep -q "Unknown digest 'sha256'! Use '../curl --digest-list' for a list of available digests."
+  run "-" "-" grep -q "Unknown digest 'sha256'! Use '../curl --digest-list' for a list of available digests." "${STD_ERR}"
   no_file "${TEST_DIR}/digest_a.tmp"
   no_file "${TEST_DIR}/digest_b.tmp"
   no_file "${TEST_DIR}/digest_c.tmp"
