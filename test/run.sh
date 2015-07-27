@@ -69,7 +69,7 @@ begin_test() {
 }
 
 echo "no python: ${NO_PYTHON}"
-echo "available digests"
+echo "available digests:"
 run "-" "-" ../curl --digest-list
 check_exit $? 0
 

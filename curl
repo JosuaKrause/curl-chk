@@ -29,7 +29,7 @@ fi
 if [ ! -z $NO_PYTHON ]; then
   DIGEST_LIST="md5"
 fi
-# DIGEST_LIST="md5" # TODO we don't *actually* support multiple digests yet
+DIGEST_LIST="md5" # TODO we don't *actually* support multiple digests yet
 USE_MD5SUM=
 if [ `command -v md5 2>/dev/null 1>&2; echo $?` != 0 ]; then
   USE_MD5SUM="USE_MD5SUM"
