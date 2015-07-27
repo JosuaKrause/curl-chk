@@ -7,8 +7,12 @@ python:
   - "3.4"
 sudo: false
 env:
-  - NO_PYTHON=true
-  - NO_PYTHON=false
+  - NO_PYTHON=1
+  - NO_PYTHON=0
+matrix:
+  exclude:
+    - python: "3.4"
+      env: NO_PYTHON=1
 install: true
 script: test/run.sh
 notifications:

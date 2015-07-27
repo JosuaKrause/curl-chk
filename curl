@@ -17,13 +17,19 @@ print(m.hexdigest())
 EOF
 
 REAL_CURL='curl'
-NO_PYTHON=
-DIGEST_LIST=`echo "${PYTHON_LIST}" | /usr/bin/env python - 2>/dev/null`
-if [ $? != 0 ]; then
+if [ ! -z $NO_PYTHON ] && [ $NO_PYTHON != 0 ]; then
   NO_PYTHON="NO_PYTHON"
+else
+  NO_PYTHON=
+  DIGEST_LIST=`echo "${PYTHON_LIST}" | /usr/bin/env python - 2>/dev/null`
+  if [ $? != 0 ]; then
+    NO_PYTHON="NO_PYTHON"
+  fi
+fi
+if [ ! -z $NO_PYTHON ]; then
   DIGEST_LIST="md5"
 fi
-DIGEST_LIST="md5" # we don't *actually* support multiple digests yet
+# DIGEST_LIST="md5" # TODO we don't *actually* support multiple digests yet
 USE_MD5SUM=
 if [ `command -v md5 2>/dev/null 1>&2; echo $?` != 0 ]; then
   USE_MD5SUM="USE_MD5SUM"
