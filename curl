@@ -1,11 +1,15 @@
 #!/bin/bash
+# -*- coding: utf-8 -*-
+# Copyright (c) 2015 Josua Krause
 
+# python script to list hash algorithms
 read -r -d '' PYTHON_LIST <<'EOF'
 from __future__ import print_function
 import hashlib
 print("\n".join(hashlib.algorithms_available))
 EOF
 
+# python script for hashing
 read -r -d '' PYTHON_HASH <<'EOF'
 from __future__ import print_function
 import hashlib
@@ -16,34 +20,44 @@ with open(sys.argv[2], 'rb') as f:
 print(m.hexdigest())
 EOF
 
+# set the original curl if not set as environment variable
 if [ -z $REAL_CURL ]; then
   REAL_CURL='curl'
 fi
+
+# check environment variable if python should not be used
 if [ ! -z $NO_PYTHON ] && [ $NO_PYTHON != 0 ]; then
   NO_PYTHON="NO_PYTHON"
 else
   NO_PYTHON=
+  # create list of available digests -- if it errs we don't use python
   DIGEST_LIST=(`echo "${PYTHON_LIST}" | /usr/bin/env python - 2>/dev/null`)
   if [ $? != 0 ]; then
     NO_PYTHON="NO_PYTHON"
   fi
 fi
+
+USE_MD5SUM=
+# if we don't use python we can only support md5
 if [ ! -z $NO_PYTHON ]; then
   DIGEST_LIST=("md5")
-fi
-USE_MD5SUM=
-if [ `command -v md5 2>/dev/null 1>&2; echo $?` != 0 ]; then
-  USE_MD5SUM="USE_MD5SUM"
+  # probe which way of md5 created should be used
+  if [ `command -v md5 2>/dev/null 1>&2; echo $?` != 0 ]; then
+    USE_MD5SUM="USE_MD5SUM"
+  fi
 fi
 
+# joins all following arguments by the first argument
 join() {
   local IFS="$1"; shift
   echo "$*"
 }
 
+# regex patterns for parsing
 digest_pattern=`join "|" "${DIGEST_LIST[@]}"`
 url_pattern="[#\?](.*\&)*(${digest_pattern})=([0-9a-fA-F]+)"
 
+# prints the (amended) usage and exits
 usage() {
   $REAL_CURL "$@"
   local x=$?
@@ -59,18 +73,22 @@ EOF
   return $x
 }
 
+# command line flags
 quiet=
 auto_file=
-
+# current state
 cur_url=
 cur_out=
 cur_sum=
 cur_digest=
+# list of detected file triplets -- the lists need to be kept in sync
 list_out=()
 list_sum=()
 list_digest=()
 
 temp_file=
+# sets the temp file -- only one temp file will be created
+# the exit status is set to one if the temp file existed already
 make_temp_file() {
   if [ ! -z "${temp_file}" ]; then
     return 1
@@ -81,10 +99,12 @@ make_temp_file() {
     echo "Internal error: Could not create temp file" 1>&2
     exit 97
   fi
+  # make sure to remove the temp file before exiting
   trap 'rm -rf -- "${temp_file}" 2>/dev/null' EXIT
   return 0
 }
 
+# checks the digest of one file triplet
 check_file() {
   local output_file="$1"; shift
   local checksum="$1"; shift
@@ -93,6 +113,7 @@ check_file() {
   local ret=0
   if [ -f "${output_file}" ]; then
     if [ ! -z $NO_PYTHON ]; then
+      # if we don't have python we can only use md5 but this should be catched earlier
       if [ "${digest}" != "md5" ]; then
         echo "Internal error: Unsupported digest '${digest}'"
         exit 95
@@ -116,6 +137,7 @@ check_file() {
     fi
     if [ -z "${quiet}" ]; then
       local name="${output_file}"
+      # replace the temp file with something readable
       if [ "${output_file}" == "${temp_file}" ]; then
         name="STDOUT"
       fi
@@ -128,6 +150,7 @@ check_file() {
   return $ret
 }
 
+# checks the digests of all triplets in the lists
 check_list() {
   local ret=0
   local total="${#list_out[*]}"
@@ -142,24 +165,29 @@ check_list() {
     fi
     ix=$((ix+1))
   done
+  # only print the summary if there were mismatches
   if [ $ret != 0 ] && [ -z "${quiet}" ]; then
     echo "WARNING: ${no_match} of ${total} computed checksums did NOT match" 1>&2
   fi
   return $ret
 }
 
+# adds the current state as triplet to the lists
 add_to_list() {
   if [ ! -z "${cur_url}" ]; then
     if [ -z "${cur_sum}" ]; then
+      # the digest wasn't specified -- we need to detect it in the URL
       local pattern="^.*${url_pattern}[^\/]*\$"
       cur_sum=`echo "${cur_url}" | grep -E "${pattern}" | sed -E "s/${pattern}/\3/"`
       cur_digest=`echo "${cur_url}" | grep -E "${pattern}" | sed -E "s/${pattern}/\2/"`
     fi
     if [ ! -z "${auto_file}" ] && [ -z "${cur_out}" ]; then
+      # if remote name was set we need to predict the local filename
       local pattern="\/([^/#]+)(#|\$)"
       cur_out=`echo "${cur_url}" | grep -oE "${pattern}" | sed -E "s/${pattern}/\1/"`
     fi
   fi
+  # add the triplet to the list if a checksum was specified
   if [ ! -z "${cur_sum}" ]; then
     if [ ! -z "${cur_out}" ]; then
       list_out+=("${cur_out}")
@@ -170,12 +198,14 @@ add_to_list() {
     list_sum+=("${cur_sum}")
     list_digest+=("${cur_digest}")
   fi
+  # clear the current state
   cur_url=
   cur_out=
   cur_sum=
   cur_digest=
 }
 
+# sets fields of the current state
 set_cur() {
   local field="$1"; shift
   local value="$1"; shift
@@ -198,7 +228,9 @@ set_cur() {
         add_to_list
       fi
       cur_sum="${value}"
-      if [ -z `echo "${digest}" | grep -E "${digest_pattern}"` ]; then
+      # we only need to detect invalid digests here since the user explicitly
+      # put the digest as --digest argument
+      if [ -z "${digest}" ] || [ -z `echo "${digest}" | grep -E "${digest_pattern}"` ]; then
         local prefix=`echo "${digest}" | sed -E "s/^([^=]*)=.*$/\1/"`
         echo "Unknown digest '${prefix}'! Use '$0 --digest-list' for a list of available digests." 1>&2
         exit 94
@@ -214,8 +246,12 @@ set_cur() {
 
 args=()
 print_usage=
+# process command line arguments
 while [ $# -gt 0 ]; do
+  # if no_preserve_arg is set after the switch the current argument will be dropped
   no_preserve_arg=
+  # if remove_fragment is set after the switch the fragment part of the URL
+  # will be removed to guarantee matching filenames
   remove_fragment=
   case "$1" in
   -h|--help) # flag for usage
@@ -225,7 +261,7 @@ while [ $# -gt 0 ]; do
     quiet="quiet"
     no_preserve_arg="no_preserve_arg"
     ;;
-  --digest-list)
+  --digest-list) # flag for digest list -- immediately exits normally
     printf "%s\n" "${DIGEST_LIST[@]}"
     exit 0
     ;;
@@ -246,6 +282,7 @@ while [ $# -gt 0 ]; do
     set_cur out "$1" ""
     ;;
   -O|--remote-name|--remote-name-all) # automatic file name inference
+    # TODO we might need more granularity here -- see #5
     auto_file="auto_file"
     ;;
   -*) # arbitrary arguments
@@ -282,6 +319,7 @@ else
   $REAL_CURL "${args[@]}" > "${temp_file}"
 fi
 
+# exit on error
 if [ $? != 0 ]; then
   exit $?
 fi
@@ -290,6 +328,7 @@ fi
 check_list
 check_result=$?
 if [ ! -z "${temp_file}" ] && [ $check_result == 0 ]; then
+  # only actually print the temp file if the check was successful
   cat "${temp_file}"
 fi
 exit $check_result
