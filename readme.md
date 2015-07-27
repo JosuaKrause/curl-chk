@@ -25,7 +25,7 @@ The warning line only appears if at least one of the checks failed.
 Example calls:
 ```bash
 ./curl "http://example.com/#md5=09b9c392dc1f6e914cea287cb6be34b0" -o "index.html"
-./curl --digest sha1=0e973b59f476007fd10f87f347c3956065516fc0 -o "index.html" "http://example.com/"
+./curl --digest "sha1=0e973b59f476007fd10f87f347c3956065516fc0" -o "index.html" "http://example.com/"
 ./curl -O "http://example.com/index.html#md5=09b9c392dc1f6e914cea287cb6be34b0"
 ./curl "http://example.com/#md5=09b9c392dc1f6e914cea287cb6be34b0"
 ```
@@ -35,12 +35,12 @@ to *stdout* iff the verification was successful. This allows for a secure versio
 of the rather common pattern of piping a downloaded script to `sh`:
 
 ```bash
-./curl http://fancytool.com/installer#md5=e17f840d197c47df3e6d5b3bc4ca4ff4 | sh
+./curl "http://fancytool.com/installer#md5=e17f840d197c47df3e6d5b3bc4ca4ff4" | sh
 ```
 
 If a digest method does not exist the file is downloaded as if no digest was
 suggested. However, if the digest was specified using `--digest` the file will
-not be downloaded and an error will be created.
+not be downloaded and an error will be emitted.
 
 You can use the wrapper either directly or by renaming the original, setting
 the environment variable `REAL_CURL` to the new path, and
