@@ -68,6 +68,10 @@ begin_test() {
   echo "NOTICE: running test ${num_tests}"
 }
 
+echo "available digests"
+run "-" "-" ../curl --digest-list
+check_exit $? 0
+
 md5_a="d8e8fca2dc0f896fd7cb4cb0031ba249"
 md5_b="95b3644556b48a25f3366d82b0e3b349"
 

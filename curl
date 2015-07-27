@@ -1,9 +1,32 @@
 #!/bin/bash
 
+read -r -d '' PYTHON_LIST <<'EOF'
+from __future__ import print_function
+import hashlib
+print("\n".join(hashlib.algorithms_guaranteed))
+EOF
+
+read -r -d '' PYTHON_HASH <<'EOF'
+from __future__ import print_function
+import hashlib
+import sys
+m = hashlib.new(sys.argv[1])
+with open(sys.argv[2], 'rb') as f:
+  m.update(f.read())
+print(m.hexdigest())
+EOF
+
 REAL_CURL='curl'
+NO_PYTHON=
+DIGEST_LIST=`echo "${PYTHON_LIST}" | /usr/bin/env python - 2>/dev/null`
+if [ $? != 0 ]; then
+  NO_PYTHON="NO_PYTHON"
+  DIGEST_LIST="md5"
+fi
+DIGEST_LIST="md5" # we don't *actually* support multiple digests yet
 USE_MD5SUM=
 if [ `command -v md5 2>/dev/null 1>&2; echo $?` != 0 ]; then
-  USE_MD5SUM=1
+  USE_MD5SUM="USE_MD5SUM"
 fi
 
 url_pattern='[#\?](.*\&)*md5=([0-9a-fA-F]+)'
@@ -11,7 +34,8 @@ url_pattern='[#\?](.*\&)*md5=([0-9a-fA-F]+)'
 usage() {
   $REAL_CURL "$@"
   local x=$?
-  cat <<EOF
+  cat <<'EOF'
+     --digest-list   Lists all available checksum algorithms and exits
      --quiet         Indicate checksum results only in status code (42 if fail)
 This wrapper of curl will verify the contents of URLs using the md5 sum of their
 content. The expected md5 sum can either be passed with --digest or can be part
@@ -52,10 +76,19 @@ check_file() {
   local md5_cmp=
   local ret=0
   if [ -f "${output_file}" ]; then
-    if [ -z $USE_MD5SUM ]; then
-      md5_cmp=`md5 -q "${output_file}"`
+    if [ ! -z $NO_PYTHON ]; then
+      if [ -z $USE_MD5SUM ]; then
+        md5_cmp=`md5 -q "${output_file}"`
+      else
+        md5_cmp=`md5sum "${output_file}" | sed -E 's/^([0-9a-fA-F]+)($|[^0-9a-fA-F].*$)/\1/'`
+      fi
     else
-      md5_cmp=`md5sum "${output_file}" | sed -E 's/^([0-9a-fA-F]+)($|[^0-9a-fA-F].*$)/\1/'`
+      local digest="md5"
+      md5_cmp=`echo "${PYTHON_HASH}" | /usr/bin/env python - "${digest}" "${output_file}"`
+      if [ $? != 0 ]; then
+        echo "Internal error: Error while digesting" 1>&2
+        exit 96
+      fi
     fi
     local ok="OK"
     if [ "${md5_sum}" != "${md5_cmp}" ]; then
@@ -163,6 +196,10 @@ while [ $# -gt 0 ]; do
   --quiet) # flag for quiet mode
     quiet="quiet"
     no_preserve_arg="no_preserve_arg"
+    ;;
+  --digest-list)
+    echo "${DIGEST_LIST}"
+    exit 0
     ;;
   --digest) # explicit digest argument
     shift
