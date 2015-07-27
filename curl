@@ -3,7 +3,7 @@
 read -r -d '' PYTHON_LIST <<'EOF'
 from __future__ import print_function
 import hashlib
-print("\n".join(hashlib.algorithms_guaranteed))
+print("\n".join(hashlib.algorithms_available))
 EOF
 
 read -r -d '' PYTHON_HASH <<'EOF'
@@ -16,26 +16,33 @@ with open(sys.argv[2], 'rb') as f:
 print(m.hexdigest())
 EOF
 
-REAL_CURL='curl'
+if [ -z $REAL_CURL ]; then
+  REAL_CURL='curl'
+fi
 if [ ! -z $NO_PYTHON ] && [ $NO_PYTHON != 0 ]; then
   NO_PYTHON="NO_PYTHON"
 else
   NO_PYTHON=
-  DIGEST_LIST=`echo "${PYTHON_LIST}" | /usr/bin/env python - 2>/dev/null`
+  DIGEST_LIST=(`echo "${PYTHON_LIST}" | /usr/bin/env python - 2>/dev/null`)
   if [ $? != 0 ]; then
     NO_PYTHON="NO_PYTHON"
   fi
 fi
 if [ ! -z $NO_PYTHON ]; then
-  DIGEST_LIST="md5"
+  DIGEST_LIST=("md5")
 fi
-DIGEST_LIST="md5" # TODO we don't *actually* support multiple digests yet
 USE_MD5SUM=
 if [ `command -v md5 2>/dev/null 1>&2; echo $?` != 0 ]; then
   USE_MD5SUM="USE_MD5SUM"
 fi
 
-url_pattern='[#\?](.*\&)*md5=([0-9a-fA-F]+)'
+join() {
+  local IFS="$1"; shift
+  echo "$*"
+}
+
+digest_pattern=`join "|" "${DIGEST_LIST[@]}"`
+url_pattern="[#\?](.*\&)*(${digest_pattern})=([0-9a-fA-F]+)"
 
 usage() {
   $REAL_CURL "$@"
@@ -43,12 +50,12 @@ usage() {
   cat <<'EOF'
      --digest-list   Lists all available checksum algorithms and exits
      --quiet         Indicate checksum results only in status code (42 if fail)
-This wrapper of curl will verify the contents of URLs using the md5 sum of their
-content. The expected md5 sum can either be passed with --digest or can be part
+This wrapper of curl will verify the contents of URLs using a checksum of their
+content. The expected sum can either be passed with --digest or can be part
 of the URLs via the following regex:
 EOF
   echo "  /${url_pattern}/"
-  echo "Explicit md5 sums via --digest take higher precedence."
+  echo "Explicit sums via --digest take higher precedence."
   return $x
 }
 
@@ -57,9 +64,11 @@ auto_file=
 
 cur_url=
 cur_out=
-cur_md5=
+cur_sum=
+cur_digest=
 list_out=()
-list_md5=()
+list_sum=()
+list_digest=()
 
 temp_file=
 make_temp_file() {
@@ -78,26 +87,30 @@ make_temp_file() {
 
 check_file() {
   local output_file="$1"; shift
-  local md5_sum="$1"; shift
-  local md5_cmp=
+  local checksum="$1"; shift
+  local digest="$1"; shift
+  local checksum_cmp=
   local ret=0
   if [ -f "${output_file}" ]; then
     if [ ! -z $NO_PYTHON ]; then
+      if [ "${digest}" != "md5" ]; then
+        echo "Internal error: Unsupported digest '${digest}'"
+        exit 95
+      fi
       if [ -z $USE_MD5SUM ]; then
-        md5_cmp=`md5 -q "${output_file}"`
+        checksum_cmp=`md5 -q "${output_file}"`
       else
-        md5_cmp=`md5sum "${output_file}" | sed -E 's/^([0-9a-fA-F]+)($|[^0-9a-fA-F].*$)/\1/'`
+        checksum_cmp=`md5sum "${output_file}" | sed -E 's/^([0-9a-fA-F]+)($|[^0-9a-fA-F].*$)/\1/'`
       fi
     else
-      local digest="md5"
-      md5_cmp=`echo "${PYTHON_HASH}" | /usr/bin/env python - "${digest}" "${output_file}"`
+      checksum_cmp=`echo "${PYTHON_HASH}" | /usr/bin/env python - "${digest}" "${output_file}"`
       if [ $? != 0 ]; then
         echo "Internal error: Error while digesting" 1>&2
         exit 96
       fi
     fi
     local ok="OK"
-    if [ "${md5_sum}" != "${md5_cmp}" ]; then
+    if [ "${checksum}" != "${checksum_cmp}" ]; then
       ret=42
       ok="FAILED"
     fi
@@ -106,7 +119,7 @@ check_file() {
       if [ "${output_file}" == "${temp_file}" ]; then
         name="STDOUT"
       fi
-      echo "${name}: ${ok} ${md5_cmp}" 1>&2
+      echo "${name}: ${ok} ${checksum_cmp}" 1>&2
     fi
   else
     echo "Internal error: Invalid output file '${output_file}'" 1>&2
@@ -121,7 +134,7 @@ check_list() {
   local no_match=0
   local ix=0
   while [ "${ix}" -lt "${total}" ]; do
-    check_file "${list_out[$ix]}" "${list_md5[$ix]}"
+    check_file "${list_out[$ix]}" "${list_sum[$ix]}" "${list_digest[$ix]}"
     local x=$?
     if [ $x != 0 ]; then
       ret=$x
@@ -137,33 +150,36 @@ check_list() {
 
 add_to_list() {
   if [ ! -z "${cur_url}" ]; then
-    if [ -z "${cur_md5}" ]; then
+    if [ -z "${cur_sum}" ]; then
       local pattern="^.*${url_pattern}[^\/]*\$"
-      cur_md5=`echo "${cur_url}" | grep -E "${pattern}" | sed -E "s/${pattern}/\2/"`
+      cur_sum=`echo "${cur_url}" | grep -E "${pattern}" | sed -E "s/${pattern}/\3/"`
+      cur_digest=`echo "${cur_url}" | grep -E "${pattern}" | sed -E "s/${pattern}/\2/"`
     fi
     if [ ! -z "${auto_file}" ] && [ -z "${cur_out}" ]; then
       local pattern="\/([^/#]+)(#|\$)"
       cur_out=`echo "${cur_url}" | grep -oE "${pattern}" | sed -E "s/${pattern}/\1/"`
     fi
   fi
-  if [ ! -z "${cur_md5}" ]; then
+  if [ ! -z "${cur_sum}" ]; then
     if [ ! -z "${cur_out}" ]; then
       list_out+=("${cur_out}")
-      list_md5+=("${cur_md5}")
     else
       make_temp_file
       list_out+=("${temp_file}")
-      list_md5+=("${cur_md5}")
     fi
+    list_sum+=("${cur_sum}")
+    list_digest+=("${cur_digest}")
   fi
   cur_url=
   cur_out=
-  cur_md5=
+  cur_sum=
+  cur_digest=
 }
 
 set_cur() {
   local field="$1"; shift
   local value="$1"; shift
+  local digest="$1"; shift
   case "${field}" in
     url)
       if [ ! -z "${cur_url}" ]; then
@@ -177,11 +193,17 @@ set_cur() {
       fi
       cur_out="${value}"
       ;;
-    md5)
-      if [ ! -z "${cur_md5}" ]; then
+    digest)
+      if [ ! -z "${cur_sum}" ]; then
         add_to_list
       fi
-      cur_md5="${value}"
+      cur_sum="${value}"
+      if [ -z `echo "${digest}" | grep -E "${digest_pattern}"` ]; then
+        local prefix=`echo "${digest}" | sed -E "s/^([^=]*)=.*$/\1/"`
+        echo "Unknown digest '${prefix}'! Use '$0 --digest-list' for a list of available digests." 1>&2
+        exit 94
+      fi
+      cur_digest="${digest}"
       ;;
     *)
       echo "Internal error: Illegal field ${field}" 1>&2
@@ -204,24 +226,24 @@ while [ $# -gt 0 ]; do
     no_preserve_arg="no_preserve_arg"
     ;;
   --digest-list)
-    echo "${DIGEST_LIST}"
+    printf "%s\n" "${DIGEST_LIST[@]}"
     exit 0
     ;;
   --digest) # explicit digest argument
     shift
-    set_cur md5 `echo "$1" | sed "s/^md5=//"`
+    set_cur digest `echo "$1" | sed -E "s/^(${digest_pattern})=//"` `echo "$1" | sed -E "s/^(${digest_pattern})=.*$/\1/"`
     no_preserve_arg="no_preserve_arg"
     ;;
   --url) # explicit URL argument
     args+=("$1")
     shift
-    set_cur url "$1"
+    set_cur url "$1" ""
     remove_fragment="remove_fragment"
     ;;
   -o|--output) # explicit output argument
     args+=("$1")
     shift
-    set_cur out "$1"
+    set_cur out "$1" ""
     ;;
   -O|--remote-name|--remote-name-all) # automatic file name inference
     auto_file="auto_file"
@@ -229,7 +251,7 @@ while [ $# -gt 0 ]; do
   -*) # arbitrary arguments
     ;;
   *) # url
-    set_cur url "$1"
+    set_cur url "$1" ""
     remove_fragment="remove_fragment"
     ;;
   esac

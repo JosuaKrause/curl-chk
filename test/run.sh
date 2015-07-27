@@ -62,6 +62,14 @@ check_file() {
   fi
 }
 
+no_file() {
+  echo "NOTICE: expect $1 to not exist"
+  if [ -f "$1" ]; then
+    echo "$1 exists. It should not!"
+    exit 3
+  fi
+}
+
 num_tests=0
 begin_test() {
   num_tests=$((num_tests+1))
@@ -181,6 +189,48 @@ run "-" "-" grep -q "WARNING: 1 of 1 computed checksums did NOT match" "${STD_ER
 check_exit $? 0
 rm -- "${STD_ERR}"
 rm -- "${STD_OUT}"
+
+
+sha1_a="4e1243bd22c66e76c2ba9eddc1f91394e57f9f83"
+sha256_b="2056a28ea38a000f3a3328cb7fabe330638d3258affe1a869e3f92986222d997"
+## multiple digests
+# three different ones
+begin_test
+run "${STD_ERR}" "-" ../curl -# "${GITHUB_PREFIX}/a.test#sha1=${sha1_a}" -o "${TEST_DIR}/digest_a.tmp" "${GITHUB_PREFIX}/a.test?md5=${md5_a}" -o "${TEST_DIR}/digest_c.tmp" "${GITHUB_PREFIX}/b.test" --digest "sha256=${sha256_b}" -o "${TEST_DIR}/digest_b.tmp"
+x=$?
+if [ ! -z $NO_PYTHON ] && [ $NO_PYTHON != 0 ]; then
+  check_exit $x 94
+  run "-" "-" cat "${STD_ERR}"
+  run "-" "-" grep -q "Unknown digest 'sha256'! Use '../curl --digest-list' for a list of available digests."
+  no_file "${TEST_DIR}/digest_a.tmp"
+  no_file "${TEST_DIR}/digest_b.tmp"
+  no_file "${TEST_DIR}/digest_c.tmp"
+else
+  check_exit $x 0
+  check_file "a.test" "${TEST_DIR}/digest_a.tmp"
+  check_file "b.test" "${TEST_DIR}/digest_b.tmp"
+  check_file "a.test" "${TEST_DIR}/digest_c.tmp"
+  run "-" "-" cat "${STD_ERR}"
+  run "-" "-" grep -q "${TEST_DIR}/digest_a.tmp: OK ${sha1_a}" "${STD_ERR}"
+  check_exit $? 0
+  run "-" "-" grep -q "${TEST_DIR}/digest_b.tmp: OK ${sha256_b}" "${STD_ERR}"
+  check_exit $? 0
+  run "-" "-" grep -q "${TEST_DIR}/digest_c.tmp: OK ${md5_a}" "${STD_ERR}"
+  check_exit $? 0
+  rm -- "${STD_ERR}"
+fi
+
+# invalid one
+begin_test
+run "${STD_ERR}" "-" ../curl -# "${GITHUB_PREFIX}/a.test#foo=${md5_a}" -o "${TEST_DIR}/foo_a.tmp"
+check_exit $? 0
+check_file "a.test" "${TEST_DIR}/foo_a.tmp"
+run "-" "-" cat "${STD_ERR}"
+run "${STD_ERR}" "-" ../curl -# "${GITHUB_PREFIX}/b.test" --digest "foo=${md5_b}" -o "${TEST_DIR}/foo_b.tmp"
+check_exit $? 94
+run "-" "-" cat "${STD_ERR}"
+run "-" "-" grep -q "Unknown digest 'foo'! Use '../curl --digest-list' for a list of available digests." "${STD_ERR}"
+no_file "${TEST_DIR}/foo_b.tmp"
 
 echo "NOTICE: cleaning up"
 rm -r -- "${TEST_DIR}"
